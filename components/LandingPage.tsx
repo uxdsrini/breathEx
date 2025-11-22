@@ -1,10 +1,20 @@
-import React from 'react';
+
+import React, { useState } from 'react';
+import { FAQS, POLICIES } from '../constants';
+import PolicyModal from './PolicyModal';
 
 interface LandingPageProps {
   onConnect: () => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onConnect }) => {
+  const [openPolicy, setOpenPolicy] = useState<keyof typeof POLICIES | null>(null);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+
+  const toggleFaq = (index: number) => {
+    setOpenFaqIndex(openFaqIndex === index ? null : index);
+  };
+
   return (
     <div className="h-[100dvh] w-full bg-stone-50 flex flex-col text-stone-800 overflow-y-auto selection:bg-teal-100">
       
@@ -14,16 +24,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onConnect }) => {
           <span className="w-3 h-3 rounded-full bg-teal-600 block"></span>
           <h1 className="text-xl font-semibold tracking-tighter text-teal-900">ZenFlow</h1>
         </div>
-        <button 
-          onClick={onConnect}
-          className="text-sm font-medium text-stone-500 hover:text-teal-800 transition-colors"
-        >
-          Sign In
-        </button>
+        <div className="flex items-center gap-6">
+            <a href="#pricing" className="hidden md:block text-sm font-medium text-stone-500 hover:text-teal-800 transition-colors">Pricing</a>
+            <a href="#faq" className="hidden md:block text-sm font-medium text-stone-500 hover:text-teal-800 transition-colors">FAQ</a>
+            <button 
+            onClick={onConnect}
+            className="text-sm font-medium bg-white border border-stone-200 px-4 py-2 rounded-full shadow-sm hover:shadow-md hover:border-teal-200 transition-all text-stone-600"
+            >
+            Sign In
+            </button>
+        </div>
       </nav>
 
       {/* Hero Section */}
-      <main className="flex-grow flex flex-col items-center justify-start md:justify-center px-6 text-center pt-12 md:pt-10 pb-20">
+      <main className="flex flex-col items-center justify-start md:justify-center px-6 text-center pt-12 md:pt-10 pb-20">
         
         <div className="max-w-3xl mx-auto space-y-8 animate-in zoom-in-95 duration-700 delay-100 fill-mode-backwards">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-xs font-bold tracking-wider uppercase mb-4">
@@ -54,7 +68,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onConnect }) => {
         </div>
 
         {/* Feature Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-24 w-full pb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-24 w-full">
             {/* Feature 1 */}
             <div className="p-8 rounded-3xl bg-white border border-stone-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 animate-in slide-in-from-bottom-8 duration-700 delay-200 fill-mode-backwards text-left">
                 <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-700 mb-6">
@@ -94,12 +108,125 @@ const LandingPage: React.FC<LandingPageProps> = ({ onConnect }) => {
                 </p>
             </div>
         </div>
+
+        {/* Pricing Section */}
+        <div id="pricing" className="w-full max-w-5xl mx-auto mt-32">
+            <div className="text-center mb-16">
+                <h2 className="text-3xl md:text-4xl font-light text-teal-900 mb-4">Simple, Transparent Pricing</h2>
+                <p className="text-stone-500">Invest in your peace of mind. Cancel anytime.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                {/* Free Plan */}
+                <div className="bg-white p-8 rounded-3xl border border-stone-100 shadow-sm">
+                    <div className="text-lg font-medium text-stone-500 mb-2">Basic</div>
+                    <div className="text-4xl font-bold text-stone-800 mb-6">Free</div>
+                    <ul className="space-y-4 text-left mb-8">
+                        <li className="flex items-center gap-3 text-stone-600">
+                            <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                            All Breathing Presets
+                        </li>
+                        <li className="flex items-center gap-3 text-stone-600">
+                            <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                            Focus Timers
+                        </li>
+                        <li className="flex items-center gap-3 text-stone-600">
+                            <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                            Basic Progress Tracking
+                        </li>
+                    </ul>
+                    <button onClick={onConnect} className="w-full py-3 rounded-xl border border-stone-200 font-medium text-stone-600 hover:bg-stone-50 transition-colors">
+                        Get Started
+                    </button>
+                </div>
+
+                {/* Pro Plan */}
+                <div className="bg-teal-900 p-8 rounded-3xl border border-teal-800 shadow-xl text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 text-xs font-bold px-3 py-1 rounded-bl-xl">POPULAR</div>
+                    <div className="text-lg font-medium text-teal-200 mb-2">ZenFlow Pro</div>
+                    <div className="text-4xl font-bold text-white mb-1">$9.99<span className="text-lg font-normal text-teal-300">/mo</span></div>
+                    <p className="text-sm text-teal-300 mb-6">or $79.99/year (Save 33%)</p>
+                    
+                    <ul className="space-y-4 text-left mb-8">
+                        <li className="flex items-center gap-3 text-teal-50">
+                            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                            AI Camera Coach
+                        </li>
+                        <li className="flex items-center gap-3 text-teal-50">
+                            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                            Rewards Program (Earn Coupons)
+                        </li>
+                        <li className="flex items-center gap-3 text-teal-50">
+                            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                            Advanced Analytics & Health Score
+                        </li>
+                    </ul>
+                    <button onClick={onConnect} className="w-full py-3 rounded-xl bg-white text-teal-900 font-bold hover:bg-teal-50 transition-colors">
+                        Start 7-Day Free Trial
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {/* FAQ Section */}
+        <div id="faq" className="w-full max-w-3xl mx-auto mt-32 text-left">
+            <div className="text-center mb-12">
+                <h2 className="text-3xl font-light text-teal-900 mb-4">Frequently Asked Questions</h2>
+            </div>
+            
+            <div className="space-y-4">
+                {FAQS.map((faq, idx) => (
+                    <div key={idx} className="bg-white border border-stone-200 rounded-2xl overflow-hidden transition-all duration-300">
+                        <button 
+                            onClick={() => toggleFaq(idx)}
+                            className="w-full flex justify-between items-center p-6 text-left hover:bg-stone-50 transition-colors"
+                        >
+                            <span className="font-medium text-stone-800">{faq.question}</span>
+                            <svg 
+                                className={`w-5 h-5 text-stone-400 transition-transform duration-300 ${openFaqIndex === idx ? 'rotate-180' : ''}`} 
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <div className={`px-6 text-stone-600 leading-relaxed overflow-hidden transition-all duration-300 ${openFaqIndex === idx ? 'max-h-40 pb-6 opacity-100' : 'max-h-0 opacity-0'}`}>
+                            {faq.answer}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
       </main>
 
       {/* Footer */}
-      <footer className="p-8 text-center text-stone-400 text-sm shrink-0">
-        <p>© {new Date().getFullYear()} ZenFlow. Breathe easy.</p>
+      <footer className="bg-white border-t border-stone-100 py-12 mt-12 shrink-0">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="text-center md:text-left">
+                <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
+                    <span className="w-2 h-2 rounded-full bg-teal-600 block"></span>
+                    <span className="font-bold text-teal-900">ZenFlow</span>
+                </div>
+                <p className="text-sm text-stone-400">© {new Date().getFullYear()} ZenFlow Inc. Breathe easy.</p>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-6 text-sm text-stone-500">
+                <button onClick={() => setOpenPolicy('terms')} className="hover:text-teal-700 transition-colors">Terms & Conditions</button>
+                <button onClick={() => setOpenPolicy('privacy')} className="hover:text-teal-700 transition-colors">Privacy Policy</button>
+                <button onClick={() => setOpenPolicy('refund')} className="hover:text-teal-700 transition-colors">Refund Policy</button>
+                <button onClick={() => setOpenPolicy('subscription')} className="hover:text-teal-700 transition-colors">Subscription Terms</button>
+            </div>
+        </div>
       </footer>
+
+      {/* Legal Modal */}
+      {openPolicy && (
+        <PolicyModal 
+            isOpen={!!openPolicy} 
+            onClose={() => setOpenPolicy(null)} 
+            title={POLICIES[openPolicy].title}
+            content={POLICIES[openPolicy].content}
+        />
+      )}
     </div>
   );
 };

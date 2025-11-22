@@ -40,6 +40,7 @@ export const recordSession = async (userId: string, durationSeconds: number, pre
       const userData = userDoc.data();
       const currentStats: UserStats = userData.stats || {
         totalPoints: 0,
+        currentPoints: 0,
         totalMinutes: 0,
         totalSessions: 0,
         currentStreak: 0,
@@ -48,6 +49,11 @@ export const recordSession = async (userId: string, durationSeconds: number, pre
         zenScore: 0,
         level: 1
       };
+
+      // Ensure currentPoints exists (migration for old users)
+      if (currentStats.currentPoints === undefined) {
+          currentStats.currentPoints = currentStats.totalPoints;
+      }
 
       // Streak Logic
       const now = new Date();
@@ -77,6 +83,7 @@ export const recordSession = async (userId: string, durationSeconds: number, pre
 
       const updatedStats: UserStats = {
         totalPoints: currentStats.totalPoints + pointsEarned,
+        currentPoints: currentStats.currentPoints + pointsEarned, // Increment wallet balance
         totalMinutes: newTotalMinutes,
         totalSessions: newTotalSessions,
         currentStreak: newStreak,
@@ -91,14 +98,9 @@ export const recordSession = async (userId: string, durationSeconds: number, pre
 
       // 1. Update User Stats
       transaction.update(userRef, { stats: updatedStats });
-
-      // 2. Add Session Record (Note: Transaction cannot Add to collection easily, so we do it after or loosely. 
-      // However, strict consistency for history isn't as critical as stats. 
-      // We will skip adding to session collection inside transaction to keep it simple, 
-      // or use a writebatch outside. For now, updating the user stats is the critical part.)
     });
 
-    // Log session history separately (non-blocking)
+    // Log session history separately
     await addDoc(sessionRef, {
       userId,
       presetId,

@@ -1,5 +1,7 @@
 {
   "name": "ZenFlow",
   "description": "A hyper-minimalist meditation companion featuring popular breathing techniques, timed zen practices, and AI-powered guided wisdom.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

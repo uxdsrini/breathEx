@@ -12,6 +12,9 @@ const Dashboard: React.FC<DashboardProps> = ({ stats }) => {
   const radius = 30;
   const circumference = 2 * Math.PI * radius;
   const scoreOffset = circumference - ((stats.zenScore || 0) / 100) * circumference;
+  
+  // Fallback for migration
+  const currentPoints = stats.currentPoints !== undefined ? stats.currentPoints : stats.totalPoints;
 
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -72,23 +75,23 @@ const Dashboard: React.FC<DashboardProps> = ({ stats }) => {
         </div>
         
         <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
-          <div className="text-stone-400 text-xs uppercase tracking-wider font-bold mb-1">Total Time</div>
-          <div className="text-2xl font-light text-stone-800 flex items-baseline gap-1">
-            {stats.totalMinutes} <span className="text-sm text-stone-400">min</span>
+          <div className="text-stone-400 text-xs uppercase tracking-wider font-bold mb-1">Spendable Points</div>
+          <div className="text-2xl font-light text-amber-600">
+            {currentPoints.toLocaleString()}
+          </div>
+        </div>
+
+        <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
+          <div className="text-stone-400 text-xs uppercase tracking-wider font-bold mb-1">Lifetime XP</div>
+          <div className="text-2xl font-light text-stone-800">
+            {stats.totalPoints?.toLocaleString()}
           </div>
         </div>
 
         <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
           <div className="text-stone-400 text-xs uppercase tracking-wider font-bold mb-1">Sessions</div>
-          <div className="text-2xl font-light text-stone-800">
-            {stats.totalSessions}
-          </div>
-        </div>
-
-        <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
-          <div className="text-stone-400 text-xs uppercase tracking-wider font-bold mb-1">Points</div>
           <div className="text-2xl font-light text-teal-700">
-            {stats.totalPoints?.toLocaleString()}
+            {stats.totalSessions}
           </div>
         </div>
       </div>

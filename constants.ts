@@ -1,4 +1,5 @@
-import { Preset, PhaseType } from './types';
+
+import { Preset, PhaseType, Coupon } from './types';
 
 export const PRESETS: Preset[] = [
   {
@@ -70,6 +71,25 @@ export const PRESETS: Preset[] = [
     ]
   },
   {
+    id: 'mindful-movement',
+    name: 'Mindful Movement',
+    description: 'AI-guided posture analysis using your camera.',
+    type: 'timer',
+    defaultDuration: 5,
+    isPremium: true,
+    benefits: [
+      "Corrects posture in real-time using AI.",
+      "Prevents back pain and injury.",
+      "Increases body awareness and alignment."
+    ],
+    technique: [
+      "Ensure your device camera is enabled.",
+      "Stand back so your full upper body is visible.",
+      "Follow the text guidance on screen for alignment.",
+      "Hold poses as instructed."
+    ]
+  },
+  {
     id: 'zazen',
     name: 'Zazen (Just Sitting)',
     description: 'Open awareness meditation with a simple timer.',
@@ -106,3 +126,129 @@ export const PRESETS: Preset[] = [
     ]
   },
 ];
+
+export const AVAILABLE_COUPONS: Coupon[] = [
+  {
+    id: 'amazon-5',
+    provider: 'Amazon',
+    description: 'Gift Card',
+    valueDisplay: '$5',
+    cost: 500,
+    logoColor: 'bg-amber-500'
+  },
+  {
+    id: 'amazon-10',
+    provider: 'Amazon',
+    description: 'Gift Card',
+    valueDisplay: '$10',
+    cost: 900,
+    logoColor: 'bg-amber-500'
+  },
+  {
+    id: 'flipkart-500',
+    provider: 'Flipkart',
+    description: 'Voucher',
+    valueDisplay: '₹500',
+    cost: 800,
+    logoColor: 'bg-blue-500'
+  },
+  {
+    id: 'calm-month',
+    provider: 'Wellness Store',
+    description: 'Yoga Mat Discount',
+    valueDisplay: '20% OFF',
+    cost: 250,
+    logoColor: 'bg-teal-600'
+  },
+  {
+    id: 'spotify-trial',
+    provider: 'Spotify',
+    description: 'Premium Trial',
+    valueDisplay: '1 Month',
+    cost: 300,
+    logoColor: 'bg-green-500'
+  }
+];
+
+export const FAQS = [
+  {
+    question: "Is ZenFlow completely free?",
+    answer: "ZenFlow offers a generous free tier that includes all standard breathing exercises, timer presets, and basic progress tracking. The Pro plan unlocks advanced features like AI Camera Coaching and the Reward Redemption system."
+  },
+  {
+    question: "How does the AI Camera Coach work?",
+    answer: "The AI Coach uses your device's camera and Google's Gemini Live API to analyze your posture in real-time. It provides instant text feedback to help you correct your alignment without recording or storing any video data."
+  },
+  {
+    question: "Can I cancel my subscription anytime?",
+    answer: "Yes, you can cancel your subscription instantly from your profile settings. Your premium benefits will continue until the end of the current billing period."
+  },
+  {
+    question: "How do points and rewards work?",
+    answer: "You earn points for every minute you practice. These points can be redeemed for real-world coupons (like Amazon or Spotify) if you are a Pro subscriber. Points never expire as long as your account is active."
+  }
+];
+
+export const POLICIES = {
+  terms: {
+    title: "Terms & Conditions",
+    content: `
+      1. Introduction
+      Welcome to ZenFlow. By using our app, you agree to these terms. Please read them carefully.
+
+      2. Use of Service
+      ZenFlow is a tool for mindfulness and relaxation. It is not a medical device and should not replace professional medical advice.
+
+      3. Account Responsibilities
+      You are responsible for maintaining the confidentiality of your account credentials. Activity under your account is your responsibility.
+
+      4. Pro Subscription
+      Subscriptions automatically renew unless canceled 24 hours before the end of the period. Unused portions of free trials are forfeited upon purchase.
+
+      5. Termination
+      We reserve the right to terminate accounts that violate our community guidelines or attempt to exploit the reward system.
+    `
+  },
+  privacy: {
+    title: "Privacy Policy",
+    content: `
+      1. Data Collection
+      We collect your email for account management and practice statistics to track your progress.
+
+      2. Camera Data
+      The AI Camera feature processes video streams locally or via ephemeral secure cloud processing. We do NOT record or store video of you.
+
+      3. Third Parties
+      We use Firebase for authentication/database and Google Gemini for AI services. We do not sell your data to advertisers.
+
+      4. Deletion
+      You may request full account deletion by contacting support. All data will be permanently removed from our servers.
+    `
+  },
+  refund: {
+    title: "Refund Policy",
+    content: `
+      1. Subscription Refunds
+      Refunds for subscriptions are handled via the platform you purchased from (e.g., App Store, Google Play, or Stripe).
+
+      2. 14-Day Guarantee
+      If you are unsatisfied with the Web Pro version, contact us within 14 days of purchase for a full refund.
+
+      3. Reward Points
+      Points redeemed for coupons cannot be refunded or reversed once the coupon code is revealed.
+    `
+  },
+  subscription: {
+    title: "Subscription Policy",
+    content: `
+      1. Billing Cycle
+      Subscriptions are billed in advance on a monthly or yearly basis.
+
+      2. Cancellation
+      You can cancel at any time. You will retain access until the end of your paid period. No partial refunds are issued for unused time.
+
+      3. Changes to Pricing
+      We reserve the right to adjust pricing for our service or any components thereof in any manner and at any time. Any price changes will take effect following email notice to you.
+    `
+  }
+};
