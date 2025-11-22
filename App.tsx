@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PRESETS } from './constants';
 import { AppState, PhaseType, Preset } from './types';
@@ -7,6 +6,7 @@ import ZenGuide from './components/ZenGuide';
 import InfoModal from './components/InfoModal';
 import AuthModal from './components/AuthModal';
 import LandingPage from './components/LandingPage';
+import BreathingCircle from './components/BreathingCircle'; // Import the component
 import { useAuth } from './contexts/AuthContext';
 import { recordSession, calculatePoints } from './services/gamificationService';
 
@@ -87,9 +87,6 @@ const App: React.FC = () => {
         setTimerDuration(prev => {
           const newTime = prev - deltaTime;
           if (newTime <= 0) {
-            // We need to trigger complete with the *current* total accumulated time (approximated by duration here)
-            // To safely access the state, we use the setter, but for side effect (handleComplete) we need the value.
-            // Best way in loop: Trigger state change, effect handles the rest.
             return 0;
           }
           return newTime;
@@ -149,50 +146,80 @@ const App: React.FC = () => {
     initPreset(activePreset);
   };
 
-  // Visual Scaling Logic
-  const getVisualState = () => {
-    if (!activePreset.phases) {
-      return { 
-        style: { transform: 'scale(1)', transition: 'transform 0.5s ease-out' }, 
-        label: 'Focus' 
-      };
-    }
+  // Adjust Timer Duration
+  const adjustDuration = (minutes: number) => {
+    setTimerDuration(prev => {
+      const newDuration = prev + (minutes * 60);
+      // Minimum 1 minute, Maximum 180 minutes (3 hours)
+      if (newDuration < 60) return 60;
+      if (newDuration > 180 * 60) return 180 * 60;
+      return newDuration;
+    });
+  };
+
+  // --- VISUAL CALCULATIONS ---
+  const calculateBreathingScale = (): number => {
+    if (!activePreset.phases) return 1;
     
     const phase = activePreset.phases[currentPhaseIndex];
     const progress = 1 - (phaseTimeLeft / phase.duration); // 0 to 1
     
     let targetScale = 1;
+    // Logic: Inhale grows (1 to 1.8), Exhale shrinks (1.8 to 1), Hold maintains previous.
+    // We need to look at previous phase to know where "Hold" should stay.
+    
+    // Find previous phase type to determine hold state
     const prevPhaseIndex = currentPhaseIndex === 0 ? activePreset.phases.length - 1 : currentPhaseIndex - 1;
     const prevPhase = activePreset.phases[prevPhaseIndex];
     const isPrevInhale = prevPhase.type === PhaseType.Inhale;
+    const isPrevHoldAtTop = prevPhase.type === PhaseType.Hold && (
+       // Check the one before hold
+       (currentPhaseIndex > 1 ? activePreset.phases[currentPhaseIndex - 2].type === PhaseType.Inhale : false)
+    );
     
     if (phase.type === PhaseType.Inhale) {
-        targetScale = 1 + (progress * 0.8);
+        targetScale = 1 + (progress * 0.8); // 1.0 -> 1.8
     } else if (phase.type === PhaseType.Exhale) {
-        targetScale = 1.8 - (progress * 0.8);
+        targetScale = 1.8 - (progress * 0.8); // 1.8 -> 1.0
     } else if (phase.type === PhaseType.Hold) {
-        if (isPrevInhale || (prevPhase.type === PhaseType.Hold && prevPhaseIndex > 0 && activePreset.phases[prevPhaseIndex-1].type === PhaseType.Inhale)) {
+        // If we just inhaled, hold big. If we just exhaled, hold small.
+        // Also if we are holding after a hold-at-top, we stay big (unlikely in presets but possible)
+        if (isPrevInhale || isPrevHoldAtTop) {
              targetScale = 1.8;
         } else {
             targetScale = 1;
         }
     }
-    
-    return {
-        style: {
-            transform: `scale(${targetScale})`,
-            transition: 'transform 0.1s linear', 
-        },
-        label: phase.label
-    };
+    return targetScale;
   };
 
-  const { style: dynamicStyle, label: currentLabel } = (appState === AppState.Running && activePreset.type === 'breathing')
-    ? getVisualState() 
-    : { 
-        style: { transform: 'scale(1)', transition: 'transform 0.5s ease-out' }, 
-        label: activePreset.type === 'breathing' ? 'Ready' : 'Focus' 
-      };
+  // Determine current display values
+  const isBreathing = activePreset.type === 'breathing';
+  const isRunning = appState === AppState.Running;
+  
+  const currentScale = (isRunning && isBreathing) ? calculateBreathingScale() : 1;
+  
+  const currentLabel = (isRunning && isBreathing) 
+      ? activePreset.phases?.[currentPhaseIndex].label || 'Ready'
+      : (isBreathing ? 'Ready' : 'Focus');
+
+  const currentPhaseDuration = (isRunning && isBreathing) 
+      ? activePreset.phases?.[currentPhaseIndex]?.duration 
+      : undefined;
+
+  const currentMainText = (activePreset.type === 'timer')
+      ? formatTime(Math.ceil(timerDuration))
+      : (isRunning ? Math.ceil(phaseTimeLeft) : (
+         // If not running, show play icon via subText or simple start text? 
+         // BreathingCircle expects text string.
+         'Start'
+      ));
+
+  const subIcon = !isRunning && (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-white opacity-80 mt-2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+    </svg>
+  );
 
   // --- RENDER ---
   
@@ -228,7 +255,7 @@ const App: React.FC = () => {
               {appState === AppState.Running ? 'Focus Mode' : 'Ready'}
            </div>
            
-           {/* User Profile Button - Now Shows Zen Score Badge */}
+           {/* User Profile Button */}
            <button 
              onClick={() => setIsAuthOpen(true)}
              className="flex items-center gap-2 bg-white border border-stone-200 hover:border-teal-300 rounded-full py-1.5 px-2 pr-4 transition-all shadow-sm hover:shadow-md group"
@@ -276,44 +303,17 @@ const App: React.FC = () => {
             </div>
         )}
 
-        {/* Visualizer Circle */}
+        {/* Visualizer Circle Component */}
         <div className={`flex-none relative mb-6 md:mb-12 transition-all duration-500 ${showCompletion ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}>
-           <div className="relative flex items-center justify-center w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 transition-all">
-              <div className={`absolute inset-0 rounded-full bg-teal-100/40 blur-3xl transition-all duration-1000 ${appState === AppState.Running ? 'scale-125 opacity-80' : 'scale-100 opacity-0'}`}></div>
-              
-              <div 
-                className="w-48 h-48 md:w-60 md:h-60 lg:w-64 lg:h-64 rounded-full bg-teal-800 shadow-2xl flex items-center justify-center text-teal-50 z-10 relative"
-                style={dynamicStyle}
-              >
-                  {/* Breathing Content */}
-                  {activePreset.type === 'breathing' && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                          <span className="text-xs md:text-sm uppercase tracking-[0.3em] font-medium text-teal-100/80 mb-1 transition-all">
-                             {appState === AppState.Running ? currentLabel : 'Start'}
-                          </span>
-                          {appState === AppState.Running && (
-                             <span className="text-4xl md:text-6xl font-light text-white tracking-tight tabular-nums animate-in fade-in duration-300">
-                                {Math.max(0, Math.ceil(phaseTimeLeft))}
-                             </span>
-                          )}
-                          {appState !== AppState.Running && (
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-white opacity-80 mt-2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-                            </svg>
-                          )}
-                      </div>
-                  )}
-              </div>
-              
-              {/* Timer Overlay */}
-              {activePreset.type === 'timer' && (
-                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                     <span className="text-5xl md:text-7xl font-light text-white tracking-widest font-mono opacity-90 drop-shadow-sm">
-                        {formatTime(Math.ceil(timerDuration))}
-                     </span>
-                 </div>
-              )}
-           </div>
+           <BreathingCircle 
+              isActive={appState === AppState.Running}
+              mode={activePreset.type}
+              scale={currentScale}
+              label={currentLabel}
+              text={currentMainText}
+              subText={!isRunning && activePreset.type === 'breathing' ? subIcon : null}
+              phaseDuration={currentPhaseDuration}
+           />
         </div>
 
         {/* Dynamic Action Area */}
@@ -322,9 +322,36 @@ const App: React.FC = () => {
           {/* IDLE STATE CONTENT */}
           <div className={`absolute inset-0 flex flex-col items-center transition-all duration-500 ${appState !== AppState.Idle ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
             <h2 className="text-2xl md:text-3xl font-light text-stone-800 mb-2 text-center">{activePreset.name}</h2>
-            <p className="text-sm md:text-base text-stone-500 leading-relaxed text-center max-w-sm mx-auto">{activePreset.description}</p>
+            <p className="text-sm md:text-base text-stone-500 leading-relaxed text-center max-w-sm mx-auto mb-6">{activePreset.description}</p>
             
-            <div className="flex flex-col items-center gap-5 mt-5">
+            {/* Duration Selector for Timer Type */}
+            {activePreset.type === 'timer' && (
+               <div className="flex items-center gap-4 mb-6 bg-white p-2 rounded-2xl border border-stone-100 shadow-sm">
+                  <button 
+                    onClick={() => adjustDuration(-1)}
+                    className="w-8 h-8 rounded-full bg-stone-50 hover:bg-stone-100 text-stone-500 flex items-center justify-center transition-colors"
+                    title="Decrease duration"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" />
+                    </svg>
+                  </button>
+                  <span className="text-lg font-medium text-stone-700 w-16 text-center tabular-nums">
+                    {Math.floor(timerDuration / 60)}m
+                  </span>
+                  <button 
+                    onClick={() => adjustDuration(1)}
+                    className="w-8 h-8 rounded-full bg-stone-50 hover:bg-stone-100 text-stone-500 flex items-center justify-center transition-colors"
+                     title="Increase duration"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </button>
+               </div>
+            )}
+            
+            <div className="flex flex-col items-center gap-5 mt-1">
                <button 
                 onClick={toggleTimer}
                 className="bg-teal-800 text-white hover:bg-teal-700 h-14 w-14 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105 active:scale-95"
