@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PRESETS } from './constants';
 import { AppState, PhaseType, Preset } from './types';
@@ -7,6 +8,7 @@ import InfoModal from './components/InfoModal';
 import AuthModal from './components/AuthModal';
 import LandingPage from './components/LandingPage';
 import { useAuth } from './contexts/AuthContext';
+import { recordSession, calculatePoints } from './services/gamificationService';
 
 // Helper to format time MM:SS
 const formatTime = (seconds: number) => {
@@ -20,8 +22,10 @@ const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.Idle);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
+  const [lastPointsEarned, setLastPointsEarned] = useState(0);
   
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, userStats } = useAuth();
   
   // Breathing State
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -40,6 +44,7 @@ const App: React.FC = () => {
     setActivePreset(preset);
     setAppState(AppState.Idle);
     setTotalSessionTime(0);
+    setShowCompletion(false);
     
     if (preset.type === 'breathing' && preset.phases) {
       setCurrentPhaseIndex(0);
@@ -49,6 +54,18 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Logic to handle session completion
+  const handleComplete = useCallback(async (finalDuration: number) => {
+    setAppState(AppState.Completed);
+    setShowCompletion(true);
+    
+    if (currentUser && finalDuration > 10) {
+      const points = calculatePoints(finalDuration);
+      setLastPointsEarned(points);
+      await recordSession(currentUser.uid, finalDuration, activePreset.id);
+    }
+  }, [currentUser, activePreset.id]);
+
   // Main Loop
   const animate = useCallback((time: number) => {
     if (appState !== AppState.Running) return;
@@ -56,19 +73,23 @@ const App: React.FC = () => {
     if (previousTimeRef.current !== undefined) {
       const deltaTime = (time - previousTimeRef.current) / 1000; // seconds
 
-      setTotalSessionTime(prev => prev + deltaTime);
+      setTotalSessionTime(prev => {
+          const newTotal = prev + deltaTime;
+          return newTotal;
+      });
 
       if (activePreset.type === 'breathing' && activePreset.phases) {
         setPhaseTimeLeft(prev => {
           const newTime = prev - deltaTime;
-          // Logic for switching is handled in useEffect to avoid state thrashing in loop
           return newTime;
         });
       } else if (activePreset.type === 'timer') {
         setTimerDuration(prev => {
           const newTime = prev - deltaTime;
           if (newTime <= 0) {
-            setAppState(AppState.Completed);
+            // We need to trigger complete with the *current* total accumulated time (approximated by duration here)
+            // To safely access the state, we use the setter, but for side effect (handleComplete) we need the value.
+            // Best way in loop: Trigger state change, effect handles the rest.
             return 0;
           }
           return newTime;
@@ -79,10 +100,16 @@ const App: React.FC = () => {
     requestRef.current = requestAnimationFrame(animate);
   }, [appState, activePreset]);
 
+  // Watch for Timer Completion in loop
+  useEffect(() => {
+      if (activePreset.type === 'timer' && timerDuration <= 0 && appState === AppState.Running) {
+          handleComplete((activePreset.defaultDuration || 10) * 60);
+      }
+  }, [timerDuration, appState, activePreset, handleComplete]);
+
   // Effect to handle phase switching for breathing
   useEffect(() => {
     if (activePreset.type === 'breathing' && activePreset.phases && appState === AppState.Running) {
-      // If we hit <= 0 (allow small epsilon for float errors)
       if (phaseTimeLeft <= 0.05) {
          const nextIndex = (currentPhaseIndex + 1) % activePreset.phases.length;
          setCurrentPhaseIndex(nextIndex);
@@ -107,16 +134,22 @@ const App: React.FC = () => {
   const toggleTimer = () => {
     if (appState === AppState.Running) {
       setAppState(AppState.Paused);
+    } else if (appState === AppState.Completed) {
+        reset();
     } else {
       setAppState(AppState.Running);
     }
+  };
+
+  const finishEarly = () => {
+      handleComplete(totalSessionTime);
   };
 
   const reset = () => {
     initPreset(activePreset);
   };
 
-  // Visual Scaling Logic calculation for the visualizer
+  // Visual Scaling Logic
   const getVisualState = () => {
     if (!activePreset.phases) {
       return { 
@@ -129,19 +162,15 @@ const App: React.FC = () => {
     const progress = 1 - (phaseTimeLeft / phase.duration); // 0 to 1
     
     let targetScale = 1;
-    
     const prevPhaseIndex = currentPhaseIndex === 0 ? activePreset.phases.length - 1 : currentPhaseIndex - 1;
     const prevPhase = activePreset.phases[prevPhaseIndex];
     const isPrevInhale = prevPhase.type === PhaseType.Inhale;
     
     if (phase.type === PhaseType.Inhale) {
-        // Lerp 1 -> 1.8
         targetScale = 1 + (progress * 0.8);
     } else if (phase.type === PhaseType.Exhale) {
-        // Lerp 1.8 -> 1
         targetScale = 1.8 - (progress * 0.8);
     } else if (phase.type === PhaseType.Hold) {
-        // Maintain previous scale
         if (isPrevInhale || (prevPhase.type === PhaseType.Hold && prevPhaseIndex > 0 && activePreset.phases[prevPhaseIndex-1].type === PhaseType.Inhale)) {
              targetScale = 1.8;
         } else {
@@ -165,7 +194,7 @@ const App: React.FC = () => {
         label: activePreset.type === 'breathing' ? 'Ready' : 'Focus' 
       };
 
-  // --- AUTHENTICATION GATING ---
+  // --- RENDER ---
   
   if (loading) {
     return (
@@ -184,8 +213,6 @@ const App: React.FC = () => {
     );
   }
 
-  // --- MAIN APPLICATION ---
-
   return (
     <div className="relative h-[100dvh] w-full flex flex-col bg-stone-50 selection:bg-teal-100 overflow-hidden animate-in fade-in duration-700">
       
@@ -201,36 +228,64 @@ const App: React.FC = () => {
               {appState === AppState.Running ? 'Focus Mode' : 'Ready'}
            </div>
            
-           {/* User Profile Button */}
+           {/* User Profile Button - Now Shows Zen Score Badge */}
            <button 
              onClick={() => setIsAuthOpen(true)}
              className="flex items-center gap-2 bg-white border border-stone-200 hover:border-teal-300 rounded-full py-1.5 px-2 pr-4 transition-all shadow-sm hover:shadow-md group"
            >
-              <div className="w-8 h-8 rounded-full bg-stone-100 text-stone-400 flex items-center justify-center overflow-hidden group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
-                   <span className="font-bold text-sm">{currentUser.email?.[0].toUpperCase()}</span>
+              <div className="w-8 h-8 rounded-full bg-stone-100 text-stone-400 flex items-center justify-center overflow-hidden group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors relative">
+                   {userStats && (
+                       <div className="absolute inset-0 rounded-full border-2 border-teal-500 opacity-20" 
+                            style={{clipPath: `inset(${100 - (userStats.zenScore || 0)}% 0 0 0)`}}></div>
+                   )}
+                   <span className="font-bold text-sm z-10">{currentUser.email?.[0].toUpperCase()}</span>
               </div>
-              <span className="text-sm font-medium text-stone-600 group-hover:text-teal-800">
-                  Profile
-              </span>
+              <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium text-stone-600 group-hover:text-teal-800 leading-none">
+                      Profile
+                  </span>
+                  {userStats && userStats.zenScore > 0 && (
+                      <span className="text-[10px] text-teal-500 font-bold mt-0.5">Score: {userStats.zenScore}</span>
+                  )}
+              </div>
            </button>
         </div>
       </header>
 
-      {/* Main Content Area - Flex Grow to take available space */}
+      {/* Main Content Area */}
       <main className="flex-grow flex flex-col items-center justify-center w-full relative z-10 pb-36 md:pb-32 pt-4">
         
-        {/* 1. Visualizer Circle */}
-        <div className="flex-none relative mb-6 md:mb-12">
+        {/* Completion Overlay */}
+        {showCompletion && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-stone-50/90 backdrop-blur-sm animate-in zoom-in-95 duration-500">
+                <div className="text-center">
+                    <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce text-teal-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-10 h-10">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                    </div>
+                    <h2 className="text-3xl font-light text-teal-900 mb-2">Session Complete</h2>
+                    <p className="text-stone-500 mb-8">You have earned <span className="font-bold text-teal-600">+{lastPointsEarned} points</span>.</p>
+                    <button 
+                        onClick={reset}
+                        className="bg-stone-900 text-white px-8 py-3 rounded-full hover:scale-105 transition-transform"
+                    >
+                        Continue
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Visualizer Circle */}
+        <div className={`flex-none relative mb-6 md:mb-12 transition-all duration-500 ${showCompletion ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}>
            <div className="relative flex items-center justify-center w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 transition-all">
-              {/* Outer Glow */}
               <div className={`absolute inset-0 rounded-full bg-teal-100/40 blur-3xl transition-all duration-1000 ${appState === AppState.Running ? 'scale-125 opacity-80' : 'scale-100 opacity-0'}`}></div>
               
-              {/* The Circle itself */}
               <div 
                 className="w-48 h-48 md:w-60 md:h-60 lg:w-64 lg:h-64 rounded-full bg-teal-800 shadow-2xl flex items-center justify-center text-teal-50 z-10 relative"
                 style={dynamicStyle}
               >
-                  {/* Breathing Content (Inside Circle) */}
+                  {/* Breathing Content */}
                   {activePreset.type === 'breathing' && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                           <span className="text-xs md:text-sm uppercase tracking-[0.3em] font-medium text-teal-100/80 mb-1 transition-all">
@@ -250,7 +305,7 @@ const App: React.FC = () => {
                   )}
               </div>
               
-              {/* Timer Overlay (for non-breathing presets) */}
+              {/* Timer Overlay */}
               {activePreset.type === 'timer' && (
                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                      <span className="text-5xl md:text-7xl font-light text-white tracking-widest font-mono opacity-90 drop-shadow-sm">
@@ -261,13 +316,12 @@ const App: React.FC = () => {
            </div>
         </div>
 
-        {/* 2. Dynamic Action Area (Text vs Controls) - Replaces Absolute Positioning */}
-        <div className="w-full max-w-md px-6 flex flex-col items-center min-h-[160px] relative">
+        {/* Dynamic Action Area */}
+        <div className={`w-full max-w-md px-6 flex flex-col items-center min-h-[160px] relative ${showCompletion ? 'opacity-0' : ''}`}>
           
           {/* IDLE STATE CONTENT */}
           <div className={`absolute inset-0 flex flex-col items-center transition-all duration-500 ${appState !== AppState.Idle ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
             <h2 className="text-2xl md:text-3xl font-light text-stone-800 mb-2 text-center">{activePreset.name}</h2>
-            {/* Fixed: Removed line-clamp and increased max-width to allow text to flow naturally on mobile */}
             <p className="text-sm md:text-base text-stone-500 leading-relaxed text-center max-w-sm mx-auto">{activePreset.description}</p>
             
             <div className="flex flex-col items-center gap-5 mt-5">
@@ -296,12 +350,12 @@ const App: React.FC = () => {
           <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-500 ${appState === AppState.Idle ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
              <div className="flex items-center gap-6">
                 <button 
-                  onClick={reset}
-                  className="w-12 h-12 rounded-full border border-stone-300 bg-white text-stone-400 hover:text-stone-600 hover:border-stone-400 flex items-center justify-center transition-all active:scale-95"
-                  title="Reset"
+                  onClick={finishEarly}
+                  className="w-12 h-12 rounded-full border border-stone-300 bg-white text-stone-400 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center transition-all active:scale-95"
+                  title="Finish & Save"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                   </svg>
                 </button>
 
@@ -326,8 +380,8 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Preset Menu (Bottom) */}
-      <div className={`fixed bottom-0 w-full bg-gradient-to-t from-stone-50 via-stone-50 to-transparent pt-8 pb-2 z-20`}>
+      {/* Preset Menu */}
+      <div className={`fixed bottom-0 w-full bg-gradient-to-t from-stone-50 via-stone-50 to-transparent pt-8 pb-2 z-20 ${showCompletion ? 'pointer-events-none opacity-0' : ''}`}>
         <PresetSelector 
           currentPresetId={activePreset.id} 
           onSelect={initPreset} 
@@ -335,20 +389,8 @@ const App: React.FC = () => {
         />
       </div>
 
-      {/* Info Modal */}
-      <InfoModal 
-        isOpen={isInfoOpen} 
-        onClose={() => setIsInfoOpen(false)} 
-        preset={activePreset} 
-      />
-
-      {/* Auth Modal */}
-      <AuthModal 
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-      />
-
-      {/* AI Zen Guide */}
+      <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} preset={activePreset} />
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
       <ZenGuide contextPresetName={activePreset.name} />
 
     </div>

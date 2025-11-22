@@ -1,5 +1,7 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import ProfileView from './ProfileView';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -13,9 +15,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, signup, currentUser, logout } = useAuth();
+  const { login, signup, currentUser } = useAuth();
 
   if (!isOpen) return null;
+
+  // If user is already logged in, show Profile View (Dashboard/Stats)
+  if (currentUser) {
+      return <ProfileView onClose={onClose} />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,13 +39,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       } else {
         await signup(email, password);
       }
-      onClose();
+      // Don't close immediately on signup/login so they see the profile/stats
       setEmail('');
       setPassword('');
       setConfirmPassword('');
     } catch (err: any) {
       console.error(err);
-      // Simple error message formatting
       if (err.code === 'auth/invalid-credential') {
         setError('Incorrect email or password.');
       } else if (err.code === 'auth/email-already-in-use') {
@@ -51,46 +57,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
     setLoading(false);
   };
-
-  const handleLogout = async () => {
-    try {
-        await logout();
-        onClose();
-    } catch {
-        setError("Failed to log out");
-    }
-  }
-
-  // If user is already logged in, show profile view
-  if (currentUser) {
-      return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-stone-900/30 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 animate-in zoom-in-95 duration-300 text-center">
-                 <button onClick={onClose} className="absolute top-4 right-4 text-stone-400 hover:text-stone-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-                
-                <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4 text-teal-700">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10">
-                        <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
-                    </svg>
-                </div>
-                <h2 className="text-xl font-semibold text-stone-800 mb-1">Welcome Back</h2>
-                <p className="text-sm text-stone-500 mb-6">{currentUser.email}</p>
-                
-                <button 
-                    onClick={handleLogout}
-                    className="w-full py-3 rounded-xl border border-stone-200 text-stone-600 hover:bg-stone-50 hover:border-stone-300 transition-colors text-sm font-medium"
-                >
-                    Sign Out
-                </button>
-            </div>
-        </div>
-      )
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

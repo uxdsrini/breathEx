@@ -1,3 +1,4 @@
+
 export enum PhaseType {
   Inhale = 'Inhale',
   Hold = 'Hold',
@@ -27,4 +28,22 @@ export enum AppState {
   Running = 'RUNNING',
   Paused = 'PAUSED',
   Completed = 'COMPLETED'
+}
+
+export interface UserStats {
+  totalPoints: number;
+  totalMinutes: number;
+  totalSessions: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastSessionDate: any; // Firestore Timestamp
+  zenScore: number; // 0-100 Health prediction
+  level: number;
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName?: string;
+  stats: UserStats;
 }
